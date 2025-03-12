@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import pandas as pd
-from torch.utils.data import DataLoader, Dataset
+from monai.data import DataLoader, Dataset
 from tqdm import tqdm
 from monai import transforms
 
@@ -74,7 +74,7 @@ def main():
         transforms.EnsureChannelFirstd(keys=["image"]),
         transforms.Orientationd(keys=["image"], axcodes="RAS"),
         transforms.ResizeWithPadOrCropd(keys=["image"], spatial_size=(182, 218, 182)),
-        transforms.Resized(keys=["image"], spatial_size=(144, 160, 144)),
+        transforms.Resized(keys=["image"], spatial_size=(128, 128, 128)),
         transforms.NormalizeIntensityd(keys=["image"]),
     ]
     )
@@ -85,7 +85,6 @@ def main():
 
     train_ds = Dataset(data=data_list, transform=train_transforms)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8, persistent_workers=True)
-
 
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -109,9 +108,9 @@ def main():
 
         # Use tqdm for the train loader to get a per-batch progress bar
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
-            im_batch = batch["images"].to(device)
-            mask_batch = batch["masks"].to(device) if mask_conditioning else None
-            classes_batch = batch["classes"].to(device).unsqueeze(1) if class_conditioning else None
+            im_batch = batch["image"].to(device)
+            mask_batch = batch["mask"].to(device) if mask_conditioning else None
+            classes_batch = batch["classe"].to(device).unsqueeze(1) if class_conditioning else None
 
             # Sample random initial noise, and random t
             x_0 = torch.randn_like(im_batch)
