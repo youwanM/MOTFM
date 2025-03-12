@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import warnings
+import datetime
 
 # Suppress most warnings for cleaner logs (comment out if debugging is needed)
 warnings.filterwarnings("ignore")
@@ -14,6 +15,7 @@ import pandas as pd
 from monai.data import DataLoader, Dataset
 from tqdm import tqdm
 from monai import transforms
+import wandb
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -86,6 +88,24 @@ def main():
     train_ds = Dataset(data=data_list, transform=train_transforms)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8, persistent_workers=True)
 
+    #Wandb Logging
+        # Define phonetic alphabet
+    phonetic_alphabet = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike", "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-ray", "Yankee", "Zulu"]
+
+    # Get current date and time
+    now = datetime.datetime.now()
+
+    # Determine the letters based on the current hour and day of the month
+    hour_index = now.hour % len(phonetic_alphabet)
+    day_index = now.day % len(phonetic_alphabet)
+    additional_code = ""
+    if now.day > 25:
+        additional_code = f"-{phonetic_alphabet[(now.day - 26) % len(phonetic_alphabet)]}"
+        run_name = f"{phonetic_alphabet[hour_index]} {phonetic_alphabet[day_index]} {additional_code}"
+    else:
+        run_name = f"{phonetic_alphabet[hour_index]} {phonetic_alphabet[day_index]}"
+    wandb.init(project="MOTFM", config=config, name=run_name)
+    
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -134,11 +154,12 @@ def main():
 
             epoch_loss += loss.item()
 
-        # Logging
+            # Log the loss at each iteration
+            wandb.log({"iteration_loss": loss.item()})
+
+        # Logging the average loss at the end of the epoch
         avg_loss = epoch_loss / len(train_loader)
-        if (epoch + 1) % print_every == 0:
-            elapsed = time.time() - start_time
-            print(f"[Epoch {epoch+1}/{num_epochs}] Loss: {avg_loss:.6f}, Time: {elapsed:.2f}s")
+        wandb.log({"epoch": epoch + 1, "epoch_loss": avg_loss})
 
         # Validation & checkpoint saving
         if (epoch + 1) % val_freq == 0:

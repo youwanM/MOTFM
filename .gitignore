@@ -4,3 +4,4 @@ data/
 *.pth
 *.pkl
 .venv/
+wandb/
