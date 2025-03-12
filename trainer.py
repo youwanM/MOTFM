@@ -10,7 +10,10 @@ warnings.filterwarnings("ignore")
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import pandas as pd
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
+from monai import transforms
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -65,34 +68,24 @@ def main():
     model = build_model(config["model_args"], device=device)
 
     # Prepare data
-    data_config = config["data_args"]
-    train_data = load_and_prepare_data(
-        pickle_path=data_config["pickle_path"],
-        split=data_config["split_train"],
-        new_masking=True,
-        convert_classes_to_onehot=True,
-    )
-    val_data = load_and_prepare_data(
-        pickle_path=data_config["pickle_path"],
-        split=data_config["split_val"],
-        new_masking=True,
-        convert_classes_to_onehot=True,
+    train_transforms = transforms.Compose(
+    [
+        transforms.LoadImaged(keys=["image"]),
+        transforms.EnsureChannelFirstd(keys=["image"]),
+        transforms.Orientationd(keys=["image"], axcodes="RAS"),
+        transforms.ResizeWithPadOrCropd(keys=["image"], spatial_size=(182, 218, 182)),
+        transforms.Resized(keys=["image"], spatial_size=(144, 160, 144)),
+        transforms.NormalizeIntensityd(keys=["image"]),
+    ]
     )
 
-    train_loader = create_dataloader(
-        Images=train_data["images"],
-        Masks=train_data["masks"],
-        classes=train_data["classes"],
-        batch_size=batch_size,
-        shuffle=True,
-    )
-    val_loader = create_dataloader(
-        Images=val_data["images"],
-        Masks=val_data["masks"],
-        classes=val_data["classes"],
-        batch_size=batch_size,
-        shuffle=False,
-    )
+    csv_file = "data/train-IXI-T1-preproc.csv" 
+    df = pd.read_csv(csv_file)
+    data_list = [{"image": path} for path in df["filepaths"]]
+
+    train_ds = Dataset(data=data_list, transform=train_transforms)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8, persistent_workers=True)
+
 
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=lr)
